@@ -89,7 +89,7 @@ def create_state_machine():
 
     fail = dict(color=EDGE_FAIL, fontcolor=EDGE_FAIL, penwidth="1.5")
     g.edge("CHECKS_RUNNING", "CHECKS_FAILED", label="Check fails / timeout", **fail)
-    g.edge("POLICY_EVALUATING", "POLICY_FAILED", label="Policy violated", **fail)
+    g.edge("POLICY_EVALUATING", "POLICY_FAILED", label="Policy violated\n(SOD · foreign commit · etc.)", **fail)
 
     # ── Merge Failure Paths ─────────────────────────────────
 
@@ -112,7 +112,7 @@ def create_state_machine():
 
     heal_purple = dict(color=EDGE_REOPEN, fontcolor=EDGE_REOPEN, penwidth="1.5", style="dashed")
     g.edge("CHECKS_FAILED", "CLOSED", label="🔄 Close & Reopen\n(max 1 · conflicts)", **heal_purple)
-    g.edge("CLOSED", "CREATED", label="New PR created\n(conflicts or foreign commit)", **heal_purple)
+    g.edge("CLOSED", "CREATED", label="New PR created\nfor same vulnerability", **heal_purple)
 
     # ── Self-Healing: Bot Retriggers (dashed orange) ────────
 
@@ -131,13 +131,6 @@ def create_state_machine():
     # ── Self-Healing: SOD Recheck from APPROVED (dashed orange) ─
     g.edge("APPROVED", "POLICY_EVALUATING",
            label="🔄 Recheck SOD (max 1)\n(2-approval repos)", constraint="false", **heal_orange)
-
-    # ── Foreign Commit Detection (solid red) ──────────────
-    g.edge("CHECKS_RUNNING", "CLOSED",
-           label="Foreign commit\ndetected", color=EDGE_FAIL, fontcolor=EDGE_FAIL, penwidth="1.5")
-
-    # ── Close & Reopen: update label ──────────────────────
-    # (CLOSED → CREATED already exists above — updated label below)
 
     # ── Escalation (solid dark red) ─────────────────────────
 
@@ -166,7 +159,6 @@ def create_state_machine():
         legend.node("L4", "")
         legend.node("L5", "")
         legend.node("L6", "")
-        legend.node("L7", "")
 
         legend.node("LT1", "")
         legend.node("LT2", "")
@@ -174,15 +166,13 @@ def create_state_machine():
         legend.node("LT4", "")
         legend.node("LT5", "")
         legend.node("LT6", "")
-        legend.node("LT7", "")
 
         legend.edge("L1", "LT1", label="Happy path", color=EDGE_HAPPY, penwidth="2.5", style="bold", fontcolor=EDGE_HAPPY)
         legend.edge("L2", "LT2", label="Failure branch", color=EDGE_FAIL, penwidth="1.5", fontcolor=EDGE_FAIL)
         legend.edge("L3", "LT3", label="Self-heal: rebuild / update", color=EDGE_HEAL_BLUE, penwidth="1.5", style="dashed", fontcolor=EDGE_HEAL_BLUE)
         legend.edge("L4", "LT4", label="Self-heal: bot retrigger", color=EDGE_HEAL_ORANGE, penwidth="1.5", style="dashed", fontcolor=EDGE_HEAL_ORANGE)
         legend.edge("L5", "LT5", label="Close & reopen", color=EDGE_REOPEN, penwidth="1.5", style="dashed", fontcolor=EDGE_REOPEN)
-        legend.edge("L6", "LT6", label="Foreign commit → close", color=EDGE_FAIL, penwidth="1.5", fontcolor=EDGE_FAIL)
-        legend.edge("L7", "LT7", label="Escalation", color=EDGE_ESCALATE, penwidth="1.5", fontcolor=EDGE_ESCALATE)
+        legend.edge("L6", "LT6", label="Escalation", color=EDGE_ESCALATE, penwidth="1.5", fontcolor=EDGE_ESCALATE)
 
     return g
 

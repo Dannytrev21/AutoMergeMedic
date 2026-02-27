@@ -76,16 +76,15 @@ def create_reconciler_flow():
 
     # Classification chain
     node(g, "C1", "1. Merge conflict?\n→ CLOSE_AND_REOPEN", "classify")
-    node(g, "C2", "2. Foreign commit?\n→ CLOSE_AND_REOPEN", "classify")
-    node(g, "C3", "3. Branch behind?\n→ UPDATE_BRANCH", "classify")
-    node(g, "C4", "4. Checks failed (transient)?\n→ RETRY_CHECKS", "classify")
-    node(g, "C5", "5. Checks failed (persistent)?\n→ NEEDS_INTERVENTION", "classify")
-    node(g, "C6", "6. Policy Bot stale?\n→ RETRIGGER_POLICY", "classify")
-    node(g, "C7", "7. SOD failure?\n(Policy Bot or Approver Bot)\n→ RETRIGGER_SOD", "classify")
-    node(g, "C8", "8. Approver Bot stale?\n→ RETRIGGER_APPROVER", "classify")
-    node(g, "C9", "9. Automerge stale?\n→ RETRIGGER_MERGE", "classify")
-    node(g, "C10", "10. Within threshold?\n→ NO_ACTION", "noact")
-    node(g, "C11", "11. Fallthrough\n→ NEEDS_INTERVENTION", "classify")
+    node(g, "C2", "2. Branch behind?\n→ UPDATE_BRANCH", "classify")
+    node(g, "C3", "3. Checks failed (transient)?\n→ RETRY_CHECKS", "classify")
+    node(g, "C4", "4. Checks failed (persistent)?\n→ NEEDS_INTERVENTION", "classify")
+    node(g, "C5", "5. Policy Bot stale?\n→ RETRIGGER_POLICY", "classify")
+    node(g, "C6", "6. SOD failure?\n(Policy Bot or Approver Bot)\n→ RETRIGGER_SOD", "classify")
+    node(g, "C7", "7. Approver Bot stale?\n→ RETRIGGER_APPROVER", "classify")
+    node(g, "C8", "8. Automerge stale?\n→ RETRIGGER_MERGE", "classify")
+    node(g, "C9", "9. Within threshold?\n→ NO_ACTION", "noact")
+    node(g, "C10", "10. Fallthrough\n→ NEEDS_INTERVENTION", "classify")
 
     node(g, "BUDGET", "Retry budget\nexhausted?", "decision")
     node(g, "ESCALATE", "→ NEEDS_INTERVENTION\nSend escalation notification", "alert")
@@ -136,15 +135,14 @@ def create_reconciler_flow():
     g.edge("C7", "C8", label="no", **chain_no)
     g.edge("C8", "C9", label="no", **chain_no)
     g.edge("C9", "C10", label="no", **chain_no)
-    g.edge("C10", "C11", label="no", **chain_no)
 
     # "yes" branches → budget or escalation
-    for c in ["C1", "C2", "C3", "C4", "C6", "C7", "C8", "C9"]:
+    for c in ["C1", "C2", "C3", "C5", "C6", "C7", "C8"]:
         g.edge(c, "BUDGET", label="yes", **chain_yes)
 
-    g.edge("C5", "ESCALATE", label="yes", color="#d63031", fontcolor="#d63031", penwidth="1.5")
-    g.edge("C11", "ESCALATE", label="matched", color="#d63031", fontcolor="#d63031", penwidth="1.5")
-    g.edge("C10", "NEXT", label="yes", color="#636e72", fontcolor="#636e72", penwidth="1.0")
+    g.edge("C4", "ESCALATE", label="yes", color="#d63031", fontcolor="#d63031", penwidth="1.5")
+    g.edge("C10", "ESCALATE", label="matched", color="#d63031", fontcolor="#d63031", penwidth="1.5")
+    g.edge("C9", "NEXT", label="yes", color="#636e72", fontcolor="#636e72", penwidth="1.0")
 
     # ── Edges: Budget & Dispatch ───────────────────────
 
