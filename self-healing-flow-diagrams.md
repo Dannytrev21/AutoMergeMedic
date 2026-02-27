@@ -25,7 +25,7 @@ flowchart LR
         EP["Event Processor<br/>Parse → Validate → Update"]
     end
 
-    subgraph store["DynamoDB"]
+    subgraph store["Data Store"]
         ST[("PR State<br/>Table")]
         ET[("PR Events<br/>Table")]
     end
@@ -108,7 +108,7 @@ flowchart TD
 
     POLICY_FAIL(["<b>POLICY_FAILED</b>"]):::fail
 
-    APPROVED(["<b>APPROVED</b><br/><sub>⏱ stale: 10 min</sub>"]):::pass
+    APPROVED(["<b>APPROVED</b><br/><sub>⏱ stale: 10 min · SOD may run here</sub>"]):::pass
 
     MERGING(["<b>MERGING</b><br/><sub>⏱ stale: 5 min</sub>"]):::active
 
@@ -128,6 +128,10 @@ flowchart TD
     %% ===== Failure Branches =====
     CHECKS_RUN -->|"Check fails / timeout"| CHECKS_FAIL
     POLICY_EVAL -->|"Policy violated"| POLICY_FAIL
+    APPROVED -.->|"🔄 Recheck SOD<br/>(max 1 · 2-approval repos)"| POLICY_EVAL
+
+    %% ===== Foreign Commit Detection =====
+    CHECKS_RUN -->|"Foreign commit detected"| CLOSED
 
     %% ===== Merge Failure Paths =====
     MERGING -->|"Branch behind →<br/>auto-update"| CHECKS_RUN
@@ -139,7 +143,7 @@ flowchart TD
 
     %% ===== SELF-HEALING: Close & Reopen =====
     CHECKS_FAIL -.->|"🔄 Close & Reopen<br/>(max 1 · conflicts)"| CLOSED
-    CLOSED -.->|"New PR created<br/>for same vulnerability"| CREATED
+    CLOSED -.->|"New PR created<br/>(conflicts or foreign commit)"| CREATED
 
     %% ===== SELF-HEALING: Stale Bot Detection =====
     CHECKS_PASS -.->|"🔄 Retrigger Policy Bot<br/>(max 2)"| POLICY_EVAL
@@ -186,7 +190,8 @@ flowchart TD
 | Recheck SOD | 1 | Policy failed on SOD specifically |
 | Retrigger Approver Bot | 2 | Approver Bot stale after policy passed |
 | Retrigger Automerge | 2 | Automerge stale after approval |
-| Close & Reopen | 1 | Merge conflicts (destructive — one shot) |
+| Recheck SOD (2-approval) | 1 | SOD failure after Approver Bot approval |
+| Close & Reopen | 1 | Merge conflicts or foreign commit (destructive — one shot) |
 
 > When any strategy's budget is exhausted and the PR is still stale → **NEEDS_INTERVENTION**.
 
@@ -217,15 +222,16 @@ flowchart TD
     CLASSIFY{"<b>Classification Engine</b><br/>(priority order)"}:::engine
 
     C1(["Merge conflict?<br/>→ CLOSE_AND_REOPEN"]):::classify
-    C2(["Branch behind?<br/>→ UPDATE_BRANCH"]):::classify
-    C3(["Checks failed<br/>(transient)?<br/>→ RETRY_CHECKS"]):::classify
-    C4(["Checks failed<br/>(persistent)?<br/>→ NEEDS_INTERVENTION"]):::classify
-    C5(["Policy Bot stale?<br/>→ RETRIGGER_POLICY"]):::classify
-    C6(["SOD failure?<br/>→ RETRIGGER_SOD"]):::classify
-    C7(["Approver Bot stale?<br/>→ RETRIGGER_APPROVER"]):::classify
-    C8(["Automerge stale?<br/>→ RETRIGGER_MERGE"]):::classify
-    C9(["Within threshold?<br/>→ NO_ACTION"]):::noact
-    C10(["Fallthrough<br/>→ NEEDS_INTERVENTION"]):::classify
+    C2(["Foreign commit?<br/>→ CLOSE_AND_REOPEN"]):::classify
+    C3(["Branch behind?<br/>→ UPDATE_BRANCH"]):::classify
+    C4(["Checks failed<br/>(transient)?<br/>→ RETRY_CHECKS"]):::classify
+    C5(["Checks failed<br/>(persistent)?<br/>→ NEEDS_INTERVENTION"]):::classify
+    C6(["Policy Bot stale?<br/>→ RETRIGGER_POLICY"]):::classify
+    C7(["SOD failure?<br/>(after Policy Bot or Approver Bot)<br/>→ RETRIGGER_SOD"]):::classify
+    C8(["Approver Bot stale?<br/>→ RETRIGGER_APPROVER"]):::classify
+    C9(["Automerge stale?<br/>→ RETRIGGER_MERGE"]):::classify
+    C10(["Within threshold?<br/>→ NO_ACTION"]):::noact
+    C11(["Fallthrough<br/>→ NEEDS_INTERVENTION"]):::classify
 
     BUDGET{"Retry budget<br/>exhausted?"}:::decision
 
@@ -271,19 +277,21 @@ flowchart TD
     C7 -->|"no"| C8
     C8 -->|"no"| C9
     C9 -->|"no"| C10
+    C10 -->|"no"| C11
 
     %% ===== Budget & Dispatch =====
     C1 -->|"yes"| BUDGET
     C2 -->|"yes"| BUDGET
     C3 -->|"yes"| BUDGET
-    C5 -->|"yes"| BUDGET
+    C4 -->|"yes"| BUDGET
     C6 -->|"yes"| BUDGET
     C7 -->|"yes"| BUDGET
     C8 -->|"yes"| BUDGET
+    C9 -->|"yes"| BUDGET
 
-    C4 -->|"yes"| ESCALATE
-    C10 -->|"matched"| ESCALATE
-    C9 -->|"yes"| NEXT
+    C5 -->|"yes"| ESCALATE
+    C11 -->|"matched"| ESCALATE
+    C10 -->|"yes"| NEXT
 
     BUDGET -->|"Yes — exhausted"| ESCALATE
     BUDGET -->|"No — OK"| DISPATCH
