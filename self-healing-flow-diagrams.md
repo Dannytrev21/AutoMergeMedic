@@ -102,7 +102,7 @@ flowchart TD
 
     CHECKS_FAIL(["<b>CHECKS_FAILED</b><br/><sub>⏱ stale: 30 min</sub>"]):::fail
 
-    POLICY_EVAL(["<b>POLICY_EVALUATING</b><br/><sub>⏱ stale: 30 min</sub>"]):::active
+    POLICY_EVAL(["<b>POLICY_EVALUATING</b><br/><sub>⏱ stale: 30 min · can run at any pre-merge stage</sub>"]):::active
 
     POLICY_PASS(["<b>POLICY_PASSED</b><br/><sub>⏱ stale: 15 min</sub>"]):::pass
 
@@ -149,9 +149,12 @@ flowchart TD
     POLICY_PASS -.->|"🔄 Retrigger Approver Bot<br/>(max 2)"| APPROVED
     APPROVED -.->|"🔄 Retrigger Automerge<br/>(max 2)"| MERGING
 
+    %% ===== Permanent Policy Failure — Close (no reopen) =====
+    POLICY_FAIL -->|"Permanent failure<br/>(foreign commit · invalid file)<br/>CodeGenie closes"| CLOSED
+
     %% ===== Escalation =====
     CHECKS_FAIL -->|"Persistent failure /<br/>budget exhausted"| NI
-    POLICY_FAIL -->|"Non-SOD failure /<br/>budget exhausted"| NI
+    POLICY_FAIL -->|"Unknown failure /<br/>budget exhausted"| NI
 
     %% ===== Styles =====
     classDef init fill:#a29bfe,stroke:#6c5ce7,color:#fff,stroke-width:2px
@@ -188,6 +191,7 @@ flowchart TD
 | Retrigger Approver Bot | 2 | Approver Bot stale after policy passed |
 | Retrigger Automerge | 2 | Automerge stale after approval |
 | Recheck SOD (2-approval) | 1 | SOD failure after Approver Bot approval |
+| Close PR (permanent) | 1 | Permanent policy failure (foreign commit, invalid file) — no reopen |
 | Close & Reopen | 1 | Merge conflicts (destructive — one shot) |
 
 > When any strategy's budget is exhausted and the PR is still stale → **NEEDS_INTERVENTION**.
@@ -224,10 +228,11 @@ flowchart TD
     C4(["Checks failed<br/>(persistent)?<br/>→ NEEDS_INTERVENTION"]):::classify
     C5(["Policy Bot stale?<br/>→ RETRIGGER_POLICY"]):::classify
     C6(["SOD failure?<br/>(after Policy Bot or Approver Bot)<br/>→ RETRIGGER_SOD"]):::classify
-    C7(["Approver Bot stale?<br/>→ RETRIGGER_APPROVER"]):::classify
-    C8(["Automerge stale?<br/>→ RETRIGGER_MERGE"]):::classify
-    C9(["Within threshold?<br/>→ NO_ACTION"]):::noact
-    C10(["Fallthrough<br/>→ NEEDS_INTERVENTION"]):::classify
+    C7(["Permanent policy failure?<br/>(foreign commit · invalid file)<br/>→ CLOSE_PR"]):::classify
+    C8(["Approver Bot stale?<br/>→ RETRIGGER_APPROVER"]):::classify
+    C9(["Automerge stale?<br/>→ RETRIGGER_MERGE"]):::classify
+    C10(["Within threshold?<br/>→ NO_ACTION"]):::noact
+    C11(["Fallthrough<br/>→ NEEDS_INTERVENTION"]):::classify
 
     BUDGET{"Retry budget<br/>exhausted?"}:::decision
 
@@ -273,6 +278,7 @@ flowchart TD
     C7 -->|"no"| C8
     C8 -->|"no"| C9
     C9 -->|"no"| C10
+    C10 -->|"no"| C11
 
     %% ===== Budget & Dispatch =====
     C1 -->|"yes"| BUDGET
@@ -282,10 +288,11 @@ flowchart TD
     C6 -->|"yes"| BUDGET
     C7 -->|"yes"| BUDGET
     C8 -->|"yes"| BUDGET
+    C9 -->|"yes"| BUDGET
 
     C4 -->|"yes"| ESCALATE
-    C10 -->|"matched"| ESCALATE
-    C9 -->|"yes"| NEXT
+    C11 -->|"matched"| ESCALATE
+    C10 -->|"yes"| NEXT
 
     BUDGET -->|"Yes — exhausted"| ESCALATE
     BUDGET -->|"No — OK"| DISPATCH

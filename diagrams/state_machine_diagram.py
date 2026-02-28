@@ -55,7 +55,7 @@ def create_state_machine():
            fillcolor=PASS_GREEN, fontcolor="#2d3436")
     g.node("CHECKS_FAILED", "CHECKS_FAILED\n⏱ stale: 30 min",
            fillcolor=FAIL_RED, fontcolor="#ffffff")
-    g.node("POLICY_EVALUATING", "POLICY_EVALUATING\n⏱ stale: 30 min",
+    g.node("POLICY_EVALUATING", "POLICY_EVALUATING\n⏱ stale: 30 min\n(can run at any pre-merge stage)",
            fillcolor=ACTIVE_BLUE, fontcolor="#ffffff")
     g.node("POLICY_PASSED", "POLICY_PASSED\n⏱ stale: 15 min",
            fillcolor=PASS_GREEN, fontcolor="#2d3436")
@@ -132,13 +132,19 @@ def create_state_machine():
     g.edge("APPROVED", "POLICY_EVALUATING",
            label="🔄 Recheck SOD (max 1)\n(2-approval repos)", constraint="false", **heal_orange)
 
+    # ── Permanent Policy Failure → Close (no reopen) ────────
+
+    g.edge("POLICY_FAILED", "CLOSED",
+           label="Permanent failure\n(foreign commit · invalid file)\nCodeGenie closes",
+           color=EDGE_ESCALATE, fontcolor=EDGE_ESCALATE, penwidth="1.5")
+
     # ── Escalation (solid dark red) ─────────────────────────
 
     esc = dict(color=EDGE_ESCALATE, fontcolor=EDGE_ESCALATE, penwidth="1.5")
     g.edge("CHECKS_FAILED", "NEEDS_INTERVENTION",
            label="Persistent failure /\nbudget exhausted", **esc)
     g.edge("POLICY_FAILED", "NEEDS_INTERVENTION",
-           label="Non-SOD failure /\nbudget exhausted", **esc)
+           label="Unknown failure /\nbudget exhausted", **esc)
 
     # ── Legend ──────────────────────────────────────────────
 
